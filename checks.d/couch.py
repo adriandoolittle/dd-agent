@@ -41,7 +41,7 @@ class CouchDb(AgentCheck):
             instance['user'], instance['password']) if 'user' in instance and 'password' in instance else None
         try:
             response = requests.get(
-                url, headers=headers(self.agentConfig), auth=auth, timeout=instance.get('timeout', TIMEOUT))
+                url, headers=headers(self.agentConfig), auth=auth, timeout=instance.get('timeout', self.TIMEOUT))
         except Timeout as e:
             self.log.warning('Request timeout: %s' % url)
         return response.json()
@@ -92,9 +92,9 @@ class CouchDb(AgentCheck):
         databases = set(self._get_stats(url, instance))
         databases = databases.intersection(whitelist) if whitelist else databases
 
-        if len(databases) > MAX_DB:
-            self.warning('Too many databases, only the first %s will be checked.' % MAX_DB)
-            databases = list(databases)[:MAX_DB]
+        if len(databases) > self.MAX_DB:
+            self.warning('Too many databases, only the first %s will be checked.' % self.MAX_DB)
+            databases = list(databases)[:self.MAX_DB]
 
         for dbName in databases:
             url = urljoin(server, dbName)
