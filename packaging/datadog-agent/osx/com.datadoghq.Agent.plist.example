@@ -7,7 +7,7 @@
   <key>Label</key>
   <string>com.datadoghq.Agent</string>
   <key>Program</key>
-  <string>AGENT_BASE/bin/agent</string>
+  <string>AGENT_BASE/bin/datadog-agent</string>
   <key>RunAtLoad</key>
   <true/>
   <key>UserName</key>
