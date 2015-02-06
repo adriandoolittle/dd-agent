@@ -4,10 +4,21 @@ cd "$BASEDIR/.."
 
 PATH=$BASEDIR/../venv/bin:$PATH
 
+. /lib/lsb/init-functions
+PATH=$PATH:/sbin # add the location of start-stop-daemon on Debian
+
+AGENTPATH="/opt/datadog-agent/agent.py"
+AGENTCONF="/etc/dd-agent/datadog.conf"
+DOGSTATSDPATH="/opt/datadog-agent/ddagent.py"
+AGENTUSER="dd-agent"
+FORWARDERPATH="/opt/datadog-agent/forwarder.py"
+SUPERVISOR_PIDFILE="/var/run/datadog-supervisord.pid"
+SUPERVISOR_FILE="/etc/dd-agent/supervisor.conf"
+SUPERVISOR_SOCK="/var/tmp/datadog-supervisor.sock"
+SUPERVISORCTL_PATH="/opt/datadog-agent/bin/supervisorctl"
+SUPERVISORD_PATH="/opt/datadog-agent/bin/supervisord"
+
 SUPERVISOR_NOT_RUNNING="Supervisor is not running"
-SUPERVISOR_CONF_FILE='/etc/dd-agent/supervisord.conf'
-SOCK_FILE='/tmp/agent-supervisor.sock'
-PID_FILE='/tmp/supervisord.pid'
 action=$1
 
 if [ ! -n "$action" ]; then
@@ -17,10 +28,10 @@ fi
 supervisor_running() {
     # Returns true if the supervisor is running, and false if not.
     # We check if the supervisor is running by checking if
-    # SOCK_FILE exists, and if there is a PID file we also verify
+    # SUPERVISOR_SOCK exists, and if there is a PID file we also verify
     # if the PID is in use.
-    if [ -e $SOCK_FILE -a -f $PID_FILE ]; then
-        pid=$(cat $PID_FILE)
+    if [ -e $SUPERVISOR_SOCK -a -f $SUPERVISOR_PIDFILE ]; then
+        pid=$(cat $SUPERVISOR_PIDFILE)
         if kill -0 $pid > /dev/null 2>&1; then
             return 0
         fi
@@ -29,10 +40,10 @@ supervisor_running() {
 }
 
 execute_if_supervisor_running() {
-    # Executes `supervisord -c $SUPERVISOR_CONF_FILE $*`
+    # Executes `$SUPERVISORD -c $SUPERVISOR_CONF_FILE $*`
     # if the supervisor is running.
     if supervisor_running; then
-        supervisorctl -c $SUPERVISOR_CONF_FILE "$*"
+        $SUPERVISORCTL_PATH -c $SUPERVISOR_CONF_FILE "$*"
         return $?
     else
         echo $SUPERVISOR_NOT_RUNNING
@@ -54,7 +65,7 @@ check_agent_status() {
         # currently controlling, and make sure that it's the
         # same as the number of programs specified in the
         # supervisor config file:
-        status_output=$(supervisorctl -c $SUPERVISOR_CONF_FILE status)
+        status_output=$($SUPERVISORCTL_PATH -c $SUPERVISOR_CONF_FILE status)
         datadog_supervisor_processes=$(echo "$status_output" |
                                        grep 'datadog-agent' |
                                        grep -c RUNNING)
@@ -80,7 +91,7 @@ case $action in
             exit 0
         else
             echo "Starting supervisor"
-            supervisord -c $SUPERVISOR_CONF_FILE
+            $SUPERVISORD_PATH -c $SUPERVISOR_CONF_FILE
             # Since the above command currently runs in the foreground, we don't
             # have to worry about checking the status of the Agent and setting
             # an exit code here.
@@ -109,29 +120,29 @@ case $action in
     info)
         shift # shift to pass the remaining arguments to agent/agent.py info.
               # Currently only agent.py takes additional arguments
-        python agent/agent.py info $@
+        $AGENTPATH info $@
         RETURN_VALUE=$?
-        python agent/dogstatsd.py info
+        $DOGSTATSDPATH info
         RETURN_VALUE=$(($RETURN_VALUE || $?))
-        python agent/ddagent.py info
+        FORWARDERPATH info
         RETURN_VALUE=$(($RETURN_VALUE || $?))
         exit $RETURN_VALUE
         ;;
 
     configcheck)
-        python agent/agent.py configcheck
+        $AGENTPATH configcheck
         exit $?
         ;;
 
     check)
         shift
-        python agent/agent.py check $@
+        $AGENTPATH check $@
         exit $?
         ;;
 
     jmx)
         shift
-        python agent/agent.py jmx $@
+        $AGENTPATH jmx $@
         exit $?
         ;;
 
