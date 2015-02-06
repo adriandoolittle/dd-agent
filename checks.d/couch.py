@@ -42,7 +42,7 @@ class CouchDb(AgentCheck):
         try:
             response = requests.get(
                 url, headers=headers(self.agentConfig), auth=auth, timeout=instance.get('timeout', self.TIMEOUT))
-        except Timeout as e:
+        except requests.exception.Timeout as e:
             self.log.warning('Request timeout: %s' % url)
         return response.json()
 
